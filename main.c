@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#define HEAP_SIZE 901
+#define HEAP_SIZE 70
 #define NEXT_POINTER(p) (((int*)((p) + 1)))
 #define PREVIOUS_POINTER(p) (((int*)((p) + 2)))
 #define CURR_FOOTER(p) ((int*)((char*)(p) + sizeof(int) + abs(*((int*)(p)))))
@@ -10,6 +10,8 @@
 #define NEXT_BLOCK(p) ((int*)((char*)(p) + sizeof(int) + *((int*)(p)) + sizeof(int)))
 #define PREVIOUS_BLOCK(p) ((int*)((char*)(p) - (int)abs(*((int*)((char*)(p) - sizeof(int)))) - sizeof(int) - sizeof(int)))
 #define NEW_SIZE(p, size) ((int)(*((int*)(p)) - 2* sizeof(int*) - size))
+
+
 
 //smernik na zaciatok vyhradenej pamate
 char* memory = NULL;
@@ -83,6 +85,7 @@ void *split(int* act, unsigned int size)
 void *memory_alloc(unsigned int size)
 {
     int* act = NULL, *new = NULL;
+    if (size < 8) size = 8;
     int rankOfList = numOfBlocks(size);
     while (*((int*)(memory + rankOfList*sizeof(int))) == -1)
         rankOfList++;
@@ -106,6 +109,7 @@ void *memory_alloc(unsigned int size)
 }
 int memory_check(void *ptr)
 {
+    if (ptr == NULL) return 0;
     int* act = (int*)ptr - 1;
     if (*act == *(CURR_FOOTER(act))) return 1;
     return 0;
@@ -165,12 +169,12 @@ void memory_init(void *ptr, unsigned int size)
 }
 
 int main()
-{
+{/*
     char region[HEAP_SIZE];
 
     memory_init(region, HEAP_SIZE);
-    char* list[30];
-
+    char* list[30];*/
+/*
     for (int i = 0; i < 30; i++) {
         list[i] = (char*)memory_alloc(8);//tu
         if (list[i] != 0) {
@@ -193,7 +197,31 @@ int main()
     }
     else {
         printf("SHIT\n");
-    }
-
+    }*//*
+    char region[100];
+    memory_init(region, 100);
+    int a;
+    char *pointer = (char *) memory_alloc(8);
+    char *pointer2 = (char *) memory_alloc(16);
+    char *pointer3 = (char *) memory_alloc(8);
+    char *pointer4 = (char *) memory_alloc(8);
+    char *pointer5 = (char *) memory_alloc(8);
+    a=memory_free(pointer2);
+    a=memory_free(pointer4);
+    char *pointer6 = (char * ) memory_alloc(8);
+    *pointer6 = 'a';*/
+    char region[70];
+    memory_init(region, 70);
+    int a;
+    char *pointer = (char *) memory_alloc(10);
+    char *pointer2 = (char *) memory_alloc(10);
+    char *pointer3 = (char *) memory_alloc(10);
+    char *pointer4 = (char *) memory_alloc(10);
+    char *pointer5 = (char *) memory_alloc(9);
+    a=memory_free(pointer);
+    a=memory_free(pointer5);
+    a=memory_free(pointer2);
+    a=memory_free(pointer4);
+    a=memory_free(pointer3);
     return 0;
 }
