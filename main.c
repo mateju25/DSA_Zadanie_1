@@ -3,86 +3,18 @@
 #include <math.h>
 #define HEAP_SIZE 70
 #define TYPE *(memory-2)
-#define NEXT_P(p) (*memory + (p) + 1)
-#define PREVIOUS_P(p) (*memory + (p) + 2)
-#define CURR_FOOTER(p, size) (p + size + TYPE)
-#define POINTER_BASEDON_POINTER(p) ((int*)(memory + abs(*((int*)(p)))))
-#define OFFSET(p) ((int)((char*)(p) - memory));
+#define NEXT_P(p) ((p) + TYPE)
+#define PREVIOUS_P(p) ((p) + 2*TYPE)
+#define CURR_FOOTER(p, size) writeToArr((p + abs(size) + TYPE), readFromArr(p))
 #define NEXT_BLOCK(p) ((int*)((char*)(p) + sizeof(int) + *((int*)(p)) + sizeof(int)))
 #define PREVIOUS_BLOCK(p) ((int*)((char*)(p) - (int)abs(*((int*)((char*)(p) - sizeof(int)))) - sizeof(int) - sizeof(int)))
-#define NEW_SIZE(p, size) ((int)(*((int*)(p)) - 2* sizeof(int*) - size))
+#define NEW_SIZE(p, size) (readFromArr(p) - 2* TYPE - size)
 
 
 
 //smernik na zaciatok vyhradenej pamate
 char* memory = NULL;
 
-int numOfBlocks(int paSize)
-{
-    if (((int)(floor(log2 (paSize)))-3) < 0)
-        return 0;
-    else
-        return ((int)(round(log2 (paSize)))-3);
-}
-void deleteBlock(int* act)
-{
-    /*if ((char*)POINTER_BASEDON_POINTER(PREVIOUS_POINTER(act)) < memory + *(memory - 1)*sizeof(int))
-        *(POINTER_BASEDON_POINTER(PREVIOUS_POINTER(act))) = *(NEXT_POINTER(act));
-    else
-        *(NEXT_POINTER(POINTER_BASEDON_POINTER(PREVIOUS_POINTER(act)))) = *(NEXT_POINTER(act));
-
-    if (*(NEXT_POINTER(act)) != -1)
-    {
-        *(PREVIOUS_POINTER(POINTER_BASEDON_POINTER(NEXT_POINTER(act)))) = *(PREVIOUS_POINTER(act));
-    }
-    memset(act+1, -1,abs(*(act)));*/
-}
-void insertBlock(int* act)
-{
-    int rankOfList = numOfBlocks(*act);
-    /**(NEXT_POINTER(act)) = *((int*)(memory + rankOfList*sizeof(int)));
-    *((int*)(memory + rankOfList*sizeof(int))) = OFFSET(act);
-    if (*(NEXT_POINTER(act)) != -1)
-    {
-        *(PREVIOUS_POINTER(POINTER_BASEDON_POINTER(NEXT_POINTER(act)))) = OFFSET(act);
-    }
-    *(PREVIOUS_POINTER(act)) = OFFSET(((int*)(memory + rankOfList*sizeof(act))));*/
-}
-int* mergeBlocks(int* first, int* second)
-{
-    //if (*((int*)NEXT_POINTER(first)) != -1)
-    deleteBlock(first);
-    *(first) += 2*sizeof(int) + *second;
-    /**(CURR_FOOTER(first)) = *first;*/
-    memset(first+1, -1, *first);
-    return first;
-}
-int* bestFit(int* act, int size)
-{
-
-    int* best = act;
-   /* while (*(NEXT_POINTER(act)) != -1)*/
-    {
-        if (*act == size) return act;
-        if (*act- size < *best - size) best = act;
-       /* act = (int*)(POINTER_BASEDON_POINTER(NEXT_POINTER(act)));*/
-    }
-    return best;
-}
-void *split(int* act, unsigned int size)
-{
-    int *new = (int*)((char*)(act) + sizeof(int) + size + sizeof(int));
-    *new = NEW_SIZE(act, size);
-    /**(CURR_FOOTER(new)) = *new;*/
-    *act= -size;
-    /**(CURR_FOOTER(act)) = -size;*/
-    deleteBlock(act);
-
-    insertBlock(new);
-
-    return act;
-}
-void writeToArr(int paOffset, int paVal)
 {
     if (*(memory - 2) == 1)
     {
@@ -100,31 +32,112 @@ void writeToArr(int paOffset, int paVal)
         }
     }
 }
+int readFromArr(int paOffset)
+{
+    if (*(memory - 2) == 1)
+    {
+        return *((char*)(memory + paOffset));
+    }
+    else
+    {
+        if (*(memory - 2) == 2)
+        {
+            return *((short*)(memory + paOffset));
+        }
+        else
+        {
+            return *((char*)(memory + paOffset));
+        }
+    }
+}
+
+int numOfBlocks(int paSize)
+{
+    if (((int)(floor(log2 (paSize)))-3) < 0)
+        return 0;
+    else
+        return ((int)(round(log2 (paSize)))-3);
+}
+void deleteBlock(int act)
+{
+    if (readFromArr(PREVIOUS_P(act)) < *(memory - 1) * TYPE)
+        writeToArr(readFromArr(PREVIOUS_P(act)), readFromArr(NEXT_P(act)));
+    else
+        writeToArr(NEXT_P(readFromArr(PREVIOUS_P(act))), NEXT_P(act));
+
+    if (readFromArr(NEXT_P(act)) != 1)
+        writeToArr(PREVIOUS_P(readFromArr(NEXT_P(act))), readFromArr(PREVIOUS_P(act)));
+    memset(memory + act + TYPE, -1, readFromArr(act));
+}
+void insertBlock(int act)
+{
+    int rankOfList = numOfBlocks(readFromArr(act));
+    writeToArr(NEXT_P(act), rankOfList* TYPE);
+    writeToArr(rankOfList* TYPE, act);
+    if (readFromArr(NEXT_P(act)) != -1)
+    {
+        writeToArr(PREVIOUS_P(readFromArr(NEXT_P(act))), act);
+    }
+    writeToArr(PREVIOUS_P(act), readFromArr(rankOfList*TYPE));
+}
+int* mergeBlocks(int* first, int* second)
+{
+    //if (*((int*)NEXT_POINTER(first)) != -1)
+    deleteBlock(first);
+    *(first) += 2*sizeof(int) + *second;
+    /**(CURR_FOOTER(first)) = *first;*/
+    memset(first+1, -1, *first);
+    return first;
+}
+int bestFit(int act, int size)
+{
+
+    int best = act;
+    while (readFromArr(NEXT_P(act)) != -1)
+    {
+        if (readFromArr(act) == size) return act;
+        if (readFromArr(act) - size < readFromArr(best) - size) best = act;
+        act = readFromArr(NEXT_P(act));
+    }
+    return best;
+}
+void *split(int act, unsigned int size)
+{
+    int new = act + TYPE + size + TYPE;
+    writeToArr(new, NEW_SIZE(act, size));
+    CURR_FOOTER(new, readFromArr(new));
+    writeToArr(act, -size);
+    CURR_FOOTER(act, size);
+    deleteBlock(act);
+
+    insertBlock(new);
+
+    return act;
+}
+
 
 void *memory_alloc(unsigned int size)
 {
-    int* act = NULL, *new = NULL;
+    int act = -1;
     if (size < 8) size = 8;
     int rankOfList = numOfBlocks(size);
-    while (*((int*)(memory + rankOfList*sizeof(int))) == -1)
+    while (readFromArr(rankOfList* TYPE) == -1)
         rankOfList++;
     if (rankOfList >= *(memory - 1)) return NULL;
-    act = (int*)(POINTER_BASEDON_POINTER(memory + rankOfList*sizeof(int)));
+    act = readFromArr(rankOfList* TYPE);
     act = bestFit(act, size);
 
 
-    if (*act >= size + 4*sizeof(int))
+    if (readFromArr(act) >= size + 4 * TYPE)
     {
         return (char*)split(act, size)+sizeof(int);
     } else
     {
-
-        *act = -*act;
-        /**(CURR_FOOTER(act)) = *act;*/
-        deleteBlock(act);
+        writeToArr(act, -readFromArr(act));
+        CURR_FOOTER(act, size);
+        //deleteBlock(act);
         return act+1;
     }
-
 }
 int memory_check(void *ptr)
 {
@@ -164,7 +177,7 @@ int memory_free(void *valid_ptr)
 void memory_init(void *ptr, unsigned int size)
 {
     char numOfLists = numOfBlocks(size)+1;
-    char act = NULL;
+    int act = NULL;
     for (int i = 0; i < HEAP_SIZE; i++)
     {
         *((char*)ptr+ i) = -1;
@@ -176,7 +189,7 @@ void memory_init(void *ptr, unsigned int size)
         else
             *((char*)ptr) = sizeof(int);
     *((char*)ptr+1) = numOfLists;
-    memory = (char*)ptr+2;
+    memory = (int*)((char*)ptr+2);
 
 
     for (int i = 0; i < numOfLists; i++)
@@ -189,7 +202,7 @@ void memory_init(void *ptr, unsigned int size)
     //vytvorenie prveho bloku
     act = numOfLists * TYPE;
     writeToArr(act, size - 2 - 3* TYPE - numOfLists* TYPE);
-    writeToArr(CURR_FOOTER(act, size - 2 - 3* TYPE - numOfLists* TYPE), size - 2 - 3* TYPE - numOfLists* TYPE);
+    CURR_FOOTER(act, readFromArr(act));
     writeToArr(act + TYPE, -1);
     writeToArr(act + 2 * TYPE, (numOfLists-1)*TYPE);
 }
