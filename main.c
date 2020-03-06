@@ -15,27 +15,29 @@
 char* memory = NULL;
 
 //funkcia poskytuje zapis do pamate na zaklade modu(char, short a int)
-void writeToArr(int paOffset, int paVal)
+void writeToArr(long paOffset, long paVal)
 {
     switch (TYPE)
     {
         case 1:{*((char*)(memory + paOffset))= (char)paVal; break;}
         case 2:{*((short*)(memory + paOffset)) = (short)paVal; break;}
         case 4:{*((int*)(memory + paOffset)) = (int)paVal; break;}
+        case 8:{*((unsigned int*)(memory + paOffset)) = (unsigned int)paVal; break;}
     }
 }
 //funkcia poskytuje citanie z pamate na zaklade modu(char, short a int)
-int readFromArr(int paOffset)
+long readFromArr(long paOffset)
 {
     switch (TYPE)
     {
         case 1:{return *((char*)(memory + paOffset));}
         case 2:{return *((short*)(memory + paOffset));}
         case 4:{return *((int*)(memory + paOffset));}
+        case 8:{return *((long*)(memory + paOffset));}
     }
 }
 //funkcia vrati cislo konkretneho segregovaneho zoznamu na zaklade velkosti
-int blockNumber(int paSize)
+int blockNumber(long paSize)
 {
     if (((int)(floor(log2 (paSize)))-3) < 0)
         return 0;
@@ -43,7 +45,7 @@ int blockNumber(int paSize)
         return ((int)(round(log2 (paSize)))-3);
 }
 //funkcia vymaze blok pamate z jeho priradeneho zoznamu
-void deleteBlock(int act)
+void deleteBlock(long act)
 {
     if (readFromArr(PREVIOUS_P(act)) < *(memory - 1) * TYPE)
         writeToArr(readFromArr(PREVIOUS_P(act)), readFromArr(NEXT_P(act)));
@@ -56,7 +58,7 @@ void deleteBlock(int act)
     //memset(memory + act + TYPE, -1, abs(readFromArr(act)));
 }
 //funkcia zaradi dany blok na zaciatok jeho priradeneho zoznamu
-void insertBlock(int act)
+void insertBlock(long act)
 {
     int rankOfList = blockNumber(readFromArr(act));
     writeToArr(NEXT_P(act), readFromArr(rankOfList* TYPE));
@@ -68,7 +70,7 @@ void insertBlock(int act)
     writeToArr(PREVIOUS_P(act), rankOfList*TYPE);
 }
 //funckia spoji dva bloky, ktore idu za sebou v pamati
-int mergeBlocks(int first, int second)
+long mergeBlocks(long first, long second)
 {
     //ak este nebol vymazany zo zoznamu, tak ho vymaz
     if ((readFromArr(NEXT_P(first)) != -1) || (readFromArr(PREVIOUS_P(first)) != -1))
@@ -81,9 +83,9 @@ int mergeBlocks(int first, int second)
     return first;
 }
 //funkcia prejde prideleny zoznam(na zaklade prveho volneho bloku v nom) a najde blok, ktory ma najefektivnejsiu velkost
-int bestFit(int act, int size)
+long bestFit(long act, long size)
 {
-    int best = act;
+    long best = act;
     while (readFromArr(NEXT_P(act)) != -1)
     {
         if (readFromArr(act) == size) return act;
@@ -94,9 +96,9 @@ int bestFit(int act, int size)
     return best;
 }
 //funkcia rozdeli konkretny blok na blok velkosti size a na blok zvysnej pamate
-int split(int act, unsigned int size)
+long split(long act, unsigned int size)
 {
-    int new = act + 2* TYPE + size;
+    long new = act + 2* TYPE + size;
     //nastav hlavicku a patu novemu bloku
     writeToArr(new, readFromArr(act) - 2* TYPE - size);
     CURR_FOOTER(new, readFromArr(new));
@@ -112,7 +114,7 @@ int split(int act, unsigned int size)
 
 void *memory_alloc(unsigned int size)
 {
-    int act = -1;
+    long act = -1;
     //ak si uzivatel vypyta menej ako 8
     if (size < 8) size = 8;
     //zisti spravny zoznam
@@ -185,8 +187,10 @@ void memory_init(void *ptr, unsigned int size)
             *((char*)ptr) = sizeof(char);
         else if (size < 32767)
                 *((char*)ptr) = sizeof(short);
-            else
-                *((char*)ptr) = sizeof(int);
+            else if(size < 2147483647)
+                    *((char*)ptr) = sizeof(int);
+                  else
+                    *((char*)ptr) = sizeof(long);
     //***********************************
     //na druhe miesto pamate zapis pocet samostatnych zoznamov
     *((char*)ptr+1) = numOfLists;
@@ -205,7 +209,7 @@ void memory_init(void *ptr, unsigned int size)
 
     //vytvorenie prveho bloku
     //blok obsahuje velkost, offset na dalsi volny blok a offset na predchadzajuci volny blok
-    int act = numOfLists * TYPE;
+    unsigned int act = numOfLists * TYPE;
     writeToArr(act, size - 2 - 3* TYPE - numOfLists* TYPE);
     CURR_FOOTER(act, readFromArr(act));
     writeToArr(act + TYPE, -1);
@@ -328,12 +332,12 @@ void test3(void)
     else  printf("NEALOKOVANE %d\n", 15000);
 }
 
-/*TEST4 - PAMAT 200_000 - BLOKY NAHODNEJ VELKOSTI(8-50000) A ICH UVOLNENIE,
+/*TEST4 - PAMAT 300_000 - BLOKY NAHODNEJ VELKOSTI(8-50000) A ICH UVOLNENIE,
  *                   POTOM ALOKOVANIE 150_000*/
 void test4(void)
 {
-    char region[200000];
-    memory_init(region, 200000);
+    char region[300000];
+    memory_init(region, 300000);
     char* list[15];
     srand(time(0));
     int x = (rand() + rand()) % 50001 + 8;
@@ -354,14 +358,14 @@ void test4(void)
         }
     }
 
-    char* pointer = (char*)memory_alloc(150000);
+    char* pointer = (char*)memory_alloc(200000);
     if (pointer != NULL)
-        printf("ALOKOVANE %d\n", 150000);
-    else  printf("NEALOKOVANE %d\n", 150000);
+        printf("ALOKOVANE %d\n", 200000);
+    else  printf("NEALOKOVANE %d\n", 200000);
 }
 
 int main()
 {
-    test4();
+    test4();//prezriet vsetko ci ja na long
     return 0;
 }
