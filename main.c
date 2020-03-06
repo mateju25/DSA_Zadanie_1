@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
+#include<time.h>
+
 #define TYPE *(memory-2)    //velkost modu (char, short alebo int)
 #define NEXT_P(p) ((p) + TYPE)  //offset dalsieho volneho bloku
 #define PREVIOUS_P(p) ((p) + 2*TYPE)    //offset predchadzajuceho volneho bloku
@@ -16,7 +19,7 @@ void writeToArr(int paOffset, int paVal)
 {
     switch (TYPE)
     {
-        case 1:{*(memory + paOffset) = (char)paVal; break;}
+        case 1:{*((char*)(memory + paOffset))= (char)paVal; break;}
         case 2:{*((short*)(memory + paOffset)) = (short)paVal; break;}
         case 4:{*((int*)(memory + paOffset)) = (int)paVal; break;}
     }
@@ -28,7 +31,7 @@ int readFromArr(int paOffset)
     {
         case 1:{return *((char*)(memory + paOffset));}
         case 2:{return *((short*)(memory + paOffset));}
-        case 4:{return *((char*)(memory + paOffset));}
+        case 4:{return *((int*)(memory + paOffset));}
     }
 }
 //funkcia vrati cislo konkretneho segregovaneho zoznamu na zaklade velkosti
@@ -128,7 +131,7 @@ void *memory_alloc(unsigned int size)
     {
         //ak ma presnu velkost tak ho len prirad a nerozdeluj ho
         writeToArr(act, -readFromArr(act));
-        CURR_FOOTER(act, size);
+        CURR_FOOTER(act, readFromArr(act));
         deleteBlock(act);
         return (void*)(memory + act + TYPE);
     }
@@ -137,13 +140,14 @@ int memory_check(void *ptr)
 {
     if (ptr == NULL) return 0;
     int act = ((char*)ptr - TYPE) - memory;
-    //porovna hlavu a patu, ak sa cisla rovnaju, je obrovska pravdepodobnost, ze ide prave o moj spracovavany blok
-    if (readFromArr(act) == readFromArr(act + TYPE + abs(readFromArr(act)))) return 1;
+    //porovna hlavu a patu, ak sa cisla rovnaju, je obrovska pravdepodobnost, ze ide prave o moj spracovavany blok a este nebol uvolneny
+    if ((readFromArr(act) == readFromArr(act + TYPE + abs(readFromArr(act)))) && (readFromArr(act) > 0))  return 1;
     return 0;
 }
 int memory_free(void *valid_ptr)
 {
-    if (!(memory_check(valid_ptr))) return 1;
+    //nemusim testovat lebo v zadani bolo ze pride vzdy platny, ale inak keby trebalo, tak takto
+    //if (!(memory_check(valid_ptr))) return 1;
 
     int act = ((char*)valid_ptr - TYPE) - memory;
     int next = NEXT_BLOCK(act);
@@ -172,6 +176,10 @@ int memory_free(void *valid_ptr)
 void memory_init(void *ptr, unsigned int size)
 {
     char numOfLists = blockNumber(size)+1;
+    for (int i = 0; i < size; i++)
+    {
+        *((char*)ptr+ i) = 0;
+    }
     //zisti s akym modom sa bude pracovat a zapis ho na prve miesto pamate
         if (size < 128)
             *((char*)ptr) = sizeof(char);
@@ -204,60 +212,156 @@ void memory_init(void *ptr, unsigned int size)
     writeToArr(act + 2 * TYPE, (numOfLists-1)*TYPE);
 }
 
-int main()
+/*TEST1 - PAMAT 50 - ROVNAKE BLOKY 8 A ICH UVOLNENIE,
+ *                   POTOM ALOKOVANIE 24, 8, 8, UVOLNENIE 24 A ALOKOVANIE ZASE 8*/
+void test1(void)
 {
-    char region[900];
+    char region[50];
+    memory_init(region, 50);
 
-    memory_init(region, 900);
-    char* list[30];
+    char* list[5];
 
-    for (int i = 0; i < 30; i++) {
+    for (int i = 0; i < 5; i++) {
         list[i] = (char*)memory_alloc(8);//tu
-        if (list[i] != 0) {
-            printf("ALOKOVANE %d\n", i);
+        if (list[i] != NULL) {
+            printf("ALOKOVANE %d\n", 8);
         }
-        else  printf("NEALOKOVANE %d\n", i);
+        else  printf("NEALOKOVANE %d\n", 8);
     }
-
-    for (int i = 0; i < 30; i++) {
-        if (list[i] != 0) {
+    for (int i = 0; i < 5; i++) {
+        if (list[i] != NULL) {
             if (memory_free(list[i]) == 1) {
                 printf("PROBLEM\n");
-            }
+            } else printf("UVOLNENE\n");
         }
     }
 
-    char* pointer = (char*)memory_alloc(800);
-    if (pointer != 0) {
-        printf("HURA\n");
-    }
-    else {
-        printf("SHIT\n");
-    }
-    /*char region[100];
-    memory_init(region, 100);
-    int a;
-    char *pointer = (char *) memory_alloc(8);
-    char *pointer2 = (char *) memory_alloc(16);
+    char *pointer = (char *) memory_alloc(24);
+    if (pointer != NULL)
+        printf("ALOKOVANE 24\n");
+    char *pointer2 = (char *) memory_alloc(8);
+    if (pointer2 != NULL)
+        printf("ALOKOVANE 8\n");
     char *pointer3 = (char *) memory_alloc(8);
+    if (pointer3 != NULL)
+        printf("ALOKOVANE 8\n");
     char *pointer4 = (char *) memory_alloc(8);
+    if (pointer4 != NULL)
+        printf("ALOKOVANE 8\n");
     char *pointer5 = (char *) memory_alloc(8);
-    a=memory_free(pointer2);
-    a=memory_free(pointer4);
-    char *pointer6 = (char * ) memory_alloc(8);
-    *pointer6 = 'a';*/
-    /*char region[70];
-    memory_init(region, 70);
-    int a;
-    char *pointer = (char *) memory_alloc(10);
-    char *pointer2 = (char *) memory_alloc(10);
-    char *pointer3 = (char *) memory_alloc(10);
-    char *pointer4 = (char *) memory_alloc(10);
-    char *pointer5 = (char *) memory_alloc(9);
-    a=memory_free(pointer);
-    a=memory_free(pointer5);
-    a=memory_free(pointer2);
-    a=memory_free(pointer4);
-    a=memory_free(pointer3);
-    return 0;*/
+    if (pointer5 != NULL)
+        printf("ALOKOVANE 8\n");
+
+    if (memory_free(pointer) == 1)
+        printf("NEUVOLNENE 24\n");
+    else
+        printf("UVOLNENE 24\n");
+
+    pointer = (char *) memory_alloc(8);
+    if (pointer != NULL)
+        printf("ALOKOVANE 8\n");
+    char *pointer6 = (char *) memory_alloc(8);
+    if (pointer != NULL)
+        printf("ALOKOVANE 8\n");
+}
+
+/*TEST2 - PAMAT 100 - BLOKY NAHODNEJ VELKOSTI(8-24) A ICH UVOLNENIE,
+ *                   POTOM ALOKOVANIE 80*/
+void test2(void){
+    char region[100];
+    memory_init(region, 100);
+    char* list[10];
+    srand(time(0));
+    int x = rand() % 16 + 8;
+    for (int i = 0; i < 10; i++) {
+        list[i] = (char*)memory_alloc(x);//tu
+        if (list[i] != NULL) {
+            printf("ALOKOVANE %d\n", x);
+        }
+        else  printf("NEALOKOVANE %d\n", x);
+        x = rand() % 16 + 8;
+    }
+
+    for (int i = 0; i < 10; i++) {
+        if (list[i] != NULL) {
+            if (memory_free(list[i]) == 1) {
+                printf("PROBLEM\n");
+            } else printf("UVOLNENE\n");
+        }
+    }
+
+    char* pointer = (char*)memory_alloc(80);
+    if (pointer != NULL)
+        printf("ALOKOVANE %d\n", 80);
+    else  printf("NEALOKOVANE %d\n", 80);
+}
+
+/*TEST3 - PAMAT 20000 - BLOKY NAHODNEJ VELKOSTI(500-5000) A ICH UVOLNENIE,
+ *                   POTOM ALOKOVANIE 15000*/
+void test3(void)
+{
+    char region[20000];
+    memory_init(region, 20000);
+    char* list[10];
+    srand(time(0));
+    int x = rand() % 5001 + 500;
+    for (int i = 0; i < 10; i++) {
+        list[i] = (char*)memory_alloc(x);//tu
+        if (list[i] != NULL) {
+            printf("ALOKOVANE %d\n", x);
+        }
+        else  printf("NEALOKOVANE %d\n", x);
+        x = rand() % 5001 + 500;
+    }
+
+    for (int i = 0; i < 10; i++) {
+        if (list[i] != NULL) {
+            if (memory_free(list[i]) == 1) {
+                printf("PROBLEM\n");
+            } else printf("UVOLNENE\n");
+        }
+    }
+
+    char* pointer = (char*)memory_alloc(15000);
+    if (pointer != NULL)
+        printf("ALOKOVANE %d\n", 15000);
+    else  printf("NEALOKOVANE %d\n", 15000);
+}
+
+/*TEST4 - PAMAT 200_000 - BLOKY NAHODNEJ VELKOSTI(8-50000) A ICH UVOLNENIE,
+ *                   POTOM ALOKOVANIE 150_000*/
+void test4(void)
+{
+    char region[200000];
+    memory_init(region, 200000);
+    char* list[15];
+    srand(time(0));
+    int x = (rand() + rand()) % 50001 + 8;
+    for (int i = 0; i < 15; i++) {
+        list[i] = (char*)memory_alloc(x);//tu
+        if (list[i] != NULL) {
+            printf("ALOKOVANE %d\n", x);
+        }
+        else  printf("NEALOKOVANE %d\n", x);
+        x = (rand() + rand()) % 50001 + 8;
+    }
+
+    for (int i = 0; i < 15; i++) {
+        if (list[i] != NULL) {
+            if (memory_free(list[i]) == 1) {
+                printf("PROBLEM\n");
+            } else printf("UVOLNENE\n");
+        }
+    }
+
+    char* pointer = (char*)memory_alloc(150000);
+    if (pointer != NULL)
+        printf("ALOKOVANE %d\n", 150000);
+    else  printf("NEALOKOVANE %d\n", 150000);
+}
+
+int main()
+{
+    test4();
+    return 0;
 }
