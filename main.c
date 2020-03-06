@@ -4,7 +4,7 @@
 #define TYPE *(memory-2)
 #define NEXT_P(p) ((p) + TYPE)
 #define PREVIOUS_P(p) ((p) + 2*TYPE)
-#define CURR_FOOTER(p, size) (p + abs(size) + TYPE)
+#define CURR_FOOTER(p, size) writeToArr((p + abs(size) + TYPE), readFromArr(p))
 #define NEXT_BLOCK(p) ((p) + 2*TYPE + abs(readFromArr(p)))
 #define PREVIOUS_BLOCK(p) ((p) - abs(readFromArr(p-TYPE)) - 2* TYPE)
 #define NEW_SIZE(p, size) (readFromArr(p) - 2* TYPE - size)
@@ -80,19 +80,20 @@ void insertBlock(int act)
         writeToArr(PREVIOUS_P(readFromArr(NEXT_P(act))), act);
     }
     writeToArr(PREVIOUS_P(act), rankOfList*TYPE);
+   // memset(memory + act + TYPE, 0, abs(readFromArr(act)));
 }
 int mergeBlocks(int first, int second)
 {
     if ((readFromArr(NEXT_P(first)) != -1) || (readFromArr(PREVIOUS_P(first)) != -1))
         deleteBlock(first);
     writeToArr(first, readFromArr(first) + 2*TYPE + readFromArr(second));
-    writeToArr(CURR_FOOTER(first, readFromArr(first)), readFromArr(first));
-    //CURR_FOOTER(first, readFromArr(first));
+    CURR_FOOTER(first, readFromArr(first));
     memset(memory + first + TYPE, -1, abs(readFromArr(first)));
     return first;
 }
 int bestFit(int act, int size)
 {
+
     int best = act;
     while (readFromArr(NEXT_P(act)) != -1)
     {
@@ -106,11 +107,9 @@ int split(int act, unsigned int size)
 {
     int new = act + TYPE + size + TYPE;
     writeToArr(new, NEW_SIZE(act, size));
-    writeToArr(CURR_FOOTER(new, readFromArr(new)), readFromArr(new));
-    //CURR_FOOTER(new, readFromArr(new));
+    CURR_FOOTER(new, readFromArr(new));
     writeToArr(act, -size);
-    writeToArr(CURR_FOOTER(act, size), readFromArr(new));
-    //CURR_FOOTER(act, size);
+    CURR_FOOTER(act, size);
     deleteBlock(act);
 
     insertBlock(new);
@@ -137,8 +136,7 @@ void *memory_alloc(unsigned int size)
     } else
     {
         writeToArr(act, -readFromArr(act));
-        writeToArr(CURR_FOOTER(act, size), readFromArr(act));
-        //CURR_FOOTER(act, size);
+        CURR_FOOTER(act, size);
         deleteBlock(act);
         return (void*)(memory + act + TYPE);
     }
@@ -147,7 +145,7 @@ int memory_check(void *ptr)
 {
     if (ptr == NULL) return 0;
     int act = ((char*)ptr - TYPE) - memory;
-    if (readFromArr(act) == readFromArr(CURR_FOOTER(act, readFromArr(act)))) return 1;
+    if (readFromArr(act) == readFromArr(act + TYPE + abs(readFromArr(act)))) return 1;
     return 0;
 }
 int memory_free(void *valid_ptr)
@@ -157,8 +155,7 @@ int memory_free(void *valid_ptr)
 
     act = ((char*)valid_ptr - TYPE) - memory;
     writeToArr(act, -readFromArr(act));
-    writeToArr(CURR_FOOTER(act, readFromArr(act)), -readFromArr(act));
-    //CURR_FOOTER(act, readFromArr(act));
+    CURR_FOOTER(act, readFromArr(act));
     next = NEXT_BLOCK(act);
     if ((readFromArr(act - TYPE) != 0)&&(act > *(memory-1)* TYPE))
     {
