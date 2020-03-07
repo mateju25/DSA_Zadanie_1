@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include<time.h>
 
+#define VYPIS 0 //ak nula tak vypisuje co sa deje s pamatou
 #define TYPE *(memory-2)    //velkost modu (char, short alebo int)
 #define NEXT_P(p) ((p) + TYPE)  //offset dalsieho volneho bloku
 #define PREVIOUS_P(p) ((p) + 2*TYPE)    //offset predchadzajuceho volneho bloku
@@ -13,8 +14,6 @@
 
 //smernik na zaciatok vyhradenej pamate
 char* memory = NULL;
-
-
 
 //funkcia poskytuje zapis do pamate na zaklade modu(char, short a int)
 void writeToArr(long paOffset, long paVal)
@@ -85,16 +84,41 @@ long mergeBlocks(long first, long second)
     memset(memory + first + TYPE, -1, abs(readFromArr(first)));
     return first;
 }
-//funkcia prejde prideleny zoznam(na zaklade prveho volneho bloku v nom) a najde blok, ktory ma najefektivnejsiu velkost
-long bestFit(long first, long size)
+//funkcia prejde konkretny zoznam(na zaklade prveho volneho bloku v nom) a najde blok, ktory ma najefektivnejsiu velkost
+long bestFit(long size)
 {
-    long best = first, act = first;
+    long best = 0, act = 0;
+    //zisti spravny zoznam
+    int rankOfList = blockNumber(size);
+    while (readFromArr(rankOfList* TYPE) == -1)
+        rankOfList++;
+    if (rankOfList >= *(memory - 1)) return 0;
+    best = act = readFromArr(rankOfList* TYPE);
+    //********************
+
     while (readFromArr(NEXT_P(act)) != -1)
     {
-        if (readFromArr(act) == size) return act;
-        if (readFromArr(act) - size < readFromArr(best) - size) best = act;
         //chod na dalsi blok v zozname
         act = readFromArr(NEXT_P(act));
+        if (readFromArr(act) < size) continue;
+        if (readFromArr(best) < size) best = act;
+        if (readFromArr(act) == size) return act;
+        if (readFromArr(act) - size < readFromArr(best) - size) best = act;
+    }
+    //ak v zozname nebol dostatocne velky blok, prehladaj este zoznam s vacsimi
+    if (readFromArr(best) < size)
+    {
+        rankOfList++;
+        while (readFromArr(rankOfList* TYPE) == -1)
+            rankOfList++;
+        if (rankOfList >= *(memory - 1)) return 0;
+        act = best = readFromArr(rankOfList* TYPE);
+        while (readFromArr(NEXT_P(act)) != -1)
+        {
+            //chod na dalsi blok v zozname
+            act = readFromArr(NEXT_P(act));
+            if (readFromArr(act) - size < readFromArr(best) - size) best = act;
+        }
     }
     return best;
 }
@@ -118,29 +142,28 @@ long split(long act, unsigned int size)
 void *memory_alloc(unsigned int size)
 {
     long act = -1;
-    //ak si uzivatel vypyta menej ako 8
     if (size < 8) size = 8;
-    printf("CHCEM %d    ", size);
-    //zisti spravny zoznam
-        int rankOfList = blockNumber(size);
-        while (readFromArr(rankOfList* TYPE) == -1)
-            rankOfList++;
-        if (rankOfList >= *(memory - 1)) {printf("Nealokovane - nedostatok miesta %d\n", size); return NULL;}
-        act = readFromArr(rankOfList* TYPE);
-    //********************
-    act = bestFit(act, size);
+    //printf("CHCEM %d    ", size);
+
+    if ((act = bestFit(size)) == 0)
+    {
+        if (VYPIS == 0)
+            printf("Nealokovane - nedostatok miesta %d\n", size);
+        return NULL;
+    }
 
     //ak sa blok da rozdelit, resp. aby novy vzniknuty blok nemal menej ako 8 bajtov
-    if (readFromArr(act) >= size + 2* TYPE + 16)
+    if (readFromArr(act) >= size + 2* TYPE + 8)
     {
-        printf("Alokovane %d\n", size);
+        if (VYPIS == 0)
+            printf("Alokovane %d\n", size);
         return (void *) (memory + split(act, size) + TYPE);
     }
     else
     {
         //ak ma presnu velkost tak ho len prirad a nerozdeluj ho
-        if (size > readFromArr(act)) {printf("Nealokovane - nedostatok miesta %d\n", size); return NULL;}
-        printf("Alokovane %d *******************************************\n", readFromArr(act));
+        if (VYPIS == 0)
+            printf("Alokovane %d*************\n", readFromArr(act));
         writeToArr(act, -readFromArr(act));
         CURR_FOOTER(act, readFromArr(act));
         deleteBlock(act);
@@ -165,7 +188,8 @@ int memory_free(void *valid_ptr)
     //priprav blok na uvolnenie
     writeToArr(act, -readFromArr(act));
     CURR_FOOTER(act, readFromArr(act));
-    printf("Uvolnene %d    ", readFromArr(act));
+    if (VYPIS == 0)
+        printf("Uvolnene %d    ", readFromArr(act));
     //ak je blok, PRED uvolnovanym blokom, volny, tak ich mergni
     if ((readFromArr(act - TYPE) != 0)&&(act > *(memory-1)* TYPE))
     {
@@ -183,8 +207,8 @@ int memory_free(void *valid_ptr)
     }
     //pridaj mergnuty blok
     insertBlock(act);
-    printf("Spojene na %d\n", readFromArr(act));
-    //*((char*)valid_ptr) = NULL;
+    if (VYPIS == 0)
+        printf("Spojene na %d\n", readFromArr(act));
     return 0;
 }
 void memory_init(void *ptr, unsigned int size)
@@ -234,7 +258,7 @@ void print(long size)
     for (long i = 0; i < size - (blockNumber(size)+1)*TYPE - 2; i = i + 2*TYPE + abs(shift))
     {
         shift = readFromArr((blockNumber(size)+1)*TYPE + i);
-        printf("%ld =>", shift);
+        if (shift > 0) printf("%ld =>", shift);
     }
     printf("\n");
 }
@@ -313,7 +337,7 @@ void test3(void)
 }
 
 /*TEST4 - PAMAT 300_000 - BLOKY NAHODNEJ VELKOSTI(8-50000) A ICH UVOLNENIE,
- *                   POTOM ALOKOVANIE 150_000*/
+ *                   POTOM ALOKOVANIE 200_000*/
 void test4(void)
 {
     char region[300000];
@@ -334,7 +358,8 @@ void test4(void)
     char* pointer = (char*)memory_alloc(200000);
 }
 
-/*TEST5 - PAMAT 300_000 - NAHODNE PRIDELOVANIE BLOKOv (8-50000) A ICH NAHODNE UVLONOVANIE*/
+/*TEST5 - PAMAT 300_000 - NAHODNE PRIDELOVANIE BLOKOV (8-50000) A ICH NAHODNE UVLONOVANIE,
+ *                        NAKONIEC VSETKO UVOLNI A PRIRADI BLOK 250_000*/
 void test5(void)
 {
     char region[300000];
@@ -347,16 +372,17 @@ void test5(void)
     srand(time(0));
     int x = (rand() + rand()) % 50001 + 8;
     int y, res;
-    print(300000);
+    //print(300000);
     for (int i = 0; i < 100; i++)
     {
         y = rand() % 2;
+        if (i > 50)  y = rand() % 3;
         if (y == 0)
         {
             y = (rand()) % 30;
             if (list[y] == NULL) {
                 list[y] = (char *) memory_alloc(x);
-                print(300000);
+                //print(300000);
             }
         }
         else
@@ -365,16 +391,23 @@ void test5(void)
             if (list[y] != NULL){
                 res = memory_free(list[y]);
                 list[y] = NULL;
-                print(300000);
+                //print(300000);
             }
         }
         x = (rand() + rand()) % 50001 + 8;
     }
-
+    for (int i =0;i<30;i++)
+    {
+        if (list[i] != NULL){
+            res = memory_free(list[i]);
+        }
+    }
+    char* pointer = (char*)memory_alloc(250000);
 }
 
 int main()
 {
-    test5();
+    for (int i = 0; i<1; i++)
+        test5();
     return 0;
 }
