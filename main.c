@@ -13,9 +13,9 @@
 #define TYPE *(memory-2)    //velkost modu (char, short alebo int)
 #define NEXT_P(p) ((p) + TYPE)  //offset dalsieho volneho bloku
 #define PREVIOUS_P(p) ((p) + 2*TYPE)    //offset predchadzajuceho volneho bloku
-#define CURR_FOOTER(p, size) writeToArr((p + abs(size) + TYPE), readFromArr(p)) //nastavi patu podla toho aka je hlavicka
+#define CURR_FOOTER(p, size) writeToArr(((p) + abs(size) + TYPE), readFromArr(p)) //nastavi patu podla toho aka je hlavicka
 #define NEXT_BLOCK(p) ((p) + 2*TYPE + abs(readFromArr(p)))  //blok vpravo od daneho bloku
-#define PREVIOUS_BLOCK(p) ((p) - abs(readFromArr(p-TYPE)) - 2* TYPE)   //blok vlavo od daneho bloku
+#define PREVIOUS_BLOCK(p) ((p) - abs(readFromArr((p)-TYPE)) - 2* TYPE)   //blok vlavo od daneho bloku
 
 //smernik na zaciatok vyhradenej pamate
 char* memory = NULL;
@@ -50,50 +50,50 @@ char blockNumber(long long paSize)
         return ((char)(round(log2 (paSize)))-3);
 }
 //funkcia vymaze blok pamate z jeho priradeneho zoznamu
-void deleteBlock(long long act)
+void deleteBlock(long long paAct)
 {
-    if (readFromArr(PREVIOUS_P(act)) < *(memory - 1) * TYPE)
-        writeToArr(readFromArr(PREVIOUS_P(act)), readFromArr(NEXT_P(act)));
+    if (readFromArr(PREVIOUS_P(paAct)) < *(memory - 1) * TYPE)
+        writeToArr(readFromArr(PREVIOUS_P(paAct)), readFromArr(NEXT_P(paAct)));
     else
-        writeToArr(NEXT_P(readFromArr(PREVIOUS_P(act))), readFromArr(NEXT_P(act)));
+        writeToArr(NEXT_P(readFromArr(PREVIOUS_P(paAct))), readFromArr(NEXT_P(paAct)));
 
-    if (readFromArr(NEXT_P(act)) != -1)
-        writeToArr(PREVIOUS_P(readFromArr(NEXT_P(act))), readFromArr(PREVIOUS_P(act)));
+    if (readFromArr(NEXT_P(paAct)) != -1)
+        writeToArr(PREVIOUS_P(readFromArr(NEXT_P(paAct))), readFromArr(PREVIOUS_P(paAct)));
     //vymazanie smernikov bloku
-    writeToArr(NEXT_P(act), -1);
-    writeToArr(PREVIOUS_P(act), -1);
+    writeToArr(NEXT_P(paAct), -1);
+    writeToArr(PREVIOUS_P(paAct), -1);
 }
 //funkcia zaradi dany blok na zaciatok jeho priradeneho zoznamu
-void insertBlock(long long act)
+void insertBlock(long long paAct)
 {
-    int rankOfList = blockNumber(readFromArr(act));
-    writeToArr(NEXT_P(act), readFromArr(rankOfList* TYPE));
-    writeToArr(rankOfList* TYPE, act);
-    if (readFromArr(NEXT_P(act)) != -1)
+    int rankOfList = blockNumber(readFromArr(paAct));
+    writeToArr(NEXT_P(paAct), readFromArr(rankOfList* TYPE));
+    writeToArr(rankOfList* TYPE, paAct);
+    if (readFromArr(NEXT_P(paAct)) != -1)
     {
-        writeToArr(PREVIOUS_P(readFromArr(NEXT_P(act))), act);
+        writeToArr(PREVIOUS_P(readFromArr(NEXT_P(paAct))), paAct);
     }
-    writeToArr(PREVIOUS_P(act), rankOfList*TYPE);
+    writeToArr(PREVIOUS_P(paAct), rankOfList*TYPE);
 }
 //funckia spoji dva bloky, ktore idu za sebou v pamati
-long long mergeBlocks(long long first, long long second)
+long long mergeBlocks(long long paFirst, long long paSecond)
 {
     //ak este nebol vymazany zo zoznamu, tak ho vymaz
-    if ((readFromArr(NEXT_P(first)) != -1) || (readFromArr(PREVIOUS_P(first)) != -1))
-        deleteBlock(first);
+    if ((readFromArr(NEXT_P(paFirst)) != -1) || (readFromArr(PREVIOUS_P(paFirst)) != -1))
+        deleteBlock(paFirst);
     //spoj bloky
-    writeToArr(first, readFromArr(first) + 2*TYPE + readFromArr(second));
-    CURR_FOOTER(first, readFromArr(first));
+    writeToArr(paFirst, readFromArr(paFirst) + 2*TYPE + readFromArr(paSecond));
+    CURR_FOOTER(paFirst, readFromArr(paFirst));
     //vymaz obsah oboch blokov
-    memset(memory + first + TYPE, -1, abs(readFromArr(first)));
-    return first;
+    memset(memory + paFirst + TYPE, -1, abs(readFromArr(paFirst)));
+    return paFirst;
 }
 //funkcia prejde konkretny zoznam(na zaklade prveho volneho bloku v nom) a najde blok, ktory ma najefektivnejsiu velkost
-long long bestFit(long long size)
+long long bestFit(long long paSze)
 {
     long long best = 0, act = 0;
     //zisti spravny zoznam
-    int rankOfList = blockNumber(size);
+    int rankOfList = blockNumber(paSze);
     while (readFromArr(rankOfList* TYPE) == -1)
         rankOfList++;
     if (rankOfList >= *(memory - 1)) return 0;
@@ -104,13 +104,13 @@ long long bestFit(long long size)
     {
         //chod na dalsi blok v zozname
         act = readFromArr(NEXT_P(act));
-        if (readFromArr(act) < size) continue;
-        if (readFromArr(best) < size) best = act;
-        if (readFromArr(act) == size) return act;
-        if (readFromArr(act) - size < readFromArr(best) - size) best = act;
+        if (readFromArr(act) < paSze) continue;
+        if (readFromArr(best) < paSze) best = act;
+        if (readFromArr(act) == paSze) return act;
+        if (readFromArr(act) - paSze < readFromArr(best) - paSze) best = act;
     }
     //ak v zozname nebol dostatocne velky blok, prehladaj este zoznam s vacsimi
-    if (readFromArr(best) < size)
+    if (readFromArr(best) < paSze)
     {
         rankOfList++;
         while (readFromArr(rankOfList* TYPE) == -1)
@@ -121,34 +121,32 @@ long long bestFit(long long size)
         {
             //chod na dalsi blok v zozname
             act = readFromArr(NEXT_P(act));
-            if (readFromArr(act) - size < readFromArr(best) - size) best = act;
+            if (readFromArr(act) - paSze < readFromArr(best) - paSze) best = act;
         }
     }
     return best;
 }
 //funkcia rozdeli konkretny blok na blok velkosti size a na blok zvysnej pamate
-long long split(long long act, unsigned int size)
+long long split(long long paAct, unsigned int paSize)
 {
-    long long new = act + 2* TYPE + size;
+    long long new = paAct + 2* TYPE + paSize;
     //nastav hlavicku a patu novemu bloku
-    writeToArr(new, readFromArr(act) - 2* TYPE - size);
+    writeToArr(new, readFromArr(paAct) - 2* TYPE - paSize);
     CURR_FOOTER(new, readFromArr(new));
     //nastav hlavicku a patu staremu bloku
-    writeToArr(act, -size);
-    CURR_FOOTER(act, size);
+    writeToArr(paAct, -paSize);
+    CURR_FOOTER(paAct, paSize);
     //vymaz stary z konkretneho zoznamu
-    deleteBlock(act);
+    deleteBlock(paAct);
     //pridaj novy do spravneho zoznamu
     insertBlock(new);
-    return act;
+    return paAct;
 }
 
 void *memory_alloc(unsigned int size)
 {
     long long act = -1;
     if (size < 8) size = 8;
-    //printf("CHCEM %d    ", size);
-
     if ((act = bestFit(size)) == 0)
     {
         if (VYPIS == 0)
@@ -462,7 +460,6 @@ void test6(void)
 
 int main()
 {
-    for (int i = 0; i<1; i++)
-        test1();
+    test6();
     return 0;
 }
