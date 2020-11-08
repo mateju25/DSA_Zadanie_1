@@ -146,7 +146,9 @@ long long split(long long paAct, unsigned int paSize)
 void *memory_alloc(unsigned int size)
 {
     long long act = -1;
+    if (size <= 0) return NULL;
     if (size < 8) size = 8;
+    if (blockNumber(size) > *(memory-1)) return NULL;
     if ((act = bestFit(size)) == 0)
     {
         if (VYPIS == 0)
@@ -174,16 +176,32 @@ void *memory_alloc(unsigned int size)
 }
 int memory_check(void *ptr)
 {
-    if (ptr == NULL) return 0;
-    long long act = ((char*)ptr - TYPE) - memory;
+    if ((ptr == NULL) || ((char*)ptr < memory)) return 0;
+
+    char exit = 0;
+    long long i = *(memory-1) * TYPE;
+    //prejde implicitne vsetky bloky, aby zistil ci smernik ukazuje na nejaky blok
+    while (readFromArr(i) != 0) {
+        if (memory + i == (char*)ptr - TYPE)
+        {
+            exit = 1;
+            break;
+        }
+        if (readFromArr(i) < 0)
+           i = i - readFromArr(i) + 2 * TYPE;
+        else
+            i = i + readFromArr(i) + 2 * TYPE;
+    }
+    if (exit == 0) return 0;
+    long long act = ((char*)ptr - TYPE) - memory;//nastavi sa na zaciatok celeho bloku
     //porovna hlavu a patu, ak sa cisla rovnaju, je obrovska pravdepodobnost, ze ide prave o moj spracovavany blok + este nebol uvolneny
-    if ((readFromArr(act) == readFromArr(act + TYPE + abs(readFromArr(act)))) && (readFromArr(act) > 0))  return 1;
+    if ((readFromArr(act) == readFromArr(act + TYPE + abs(readFromArr(act)))) && (readFromArr(act) < 0))  return 1;
     return 0;
 }
 int memory_free(void *valid_ptr)
 {
-    //nemusim testovat lebo v zadani bolo ze pride vzdy platny, ale inak keby trebalo, tak takto
-    //if (!(memory_check(valid_ptr))) return 1;
+    //nemusim testovat lebo v zadani bolo ze pride vzdy platny, ale aj tak otestujem
+    if (!(memory_check(valid_ptr))) return 1;
 
     long long act = ((char*)valid_ptr - TYPE) - memory;
     long long next = NEXT_BLOCK(act);
@@ -216,6 +234,7 @@ int memory_free(void *valid_ptr)
 void memory_init(void *ptr, unsigned int size)
 {
     char numOfLists = blockNumber(size)+1;
+    //vymazanie pola
     for (long long i = 0; i < size; i++)
     {
         *((char*)ptr+ i) = -1;
@@ -288,6 +307,13 @@ void test1(void)
     }
 
     char *pointer = (char *) memory_alloc(24);
+    x=memory_check(pointer);
+    x=memory_check(region+200);
+    x=memory_check(pointer+1);
+    x =memory_free(pointer);
+    x=memory_check(pointer);
+    x=memory_check(pointer+1);
+    pointer = (char *) memory_alloc(24);
     char *pointer2 = (char *) memory_alloc(8);
     char *pointer3 = (char *) memory_alloc(8);
     char *pointer4 = (char *) memory_alloc(8);
@@ -324,7 +350,7 @@ void test2(void){
  *                   POTOM ALOKOVANIE 15000*/
 void test3(void)
 {
-    char region[20000];
+    char *region = (char*)malloc(20000);
     memory_init(region, 20000);
     char* list[10];
     srand(time(0));
@@ -346,7 +372,7 @@ void test3(void)
  *                   POTOM ALOKOVANIE 200_000*/
 void test4(void)
 {
-    char region[300000];
+    char *region = (char*)malloc(300000);
     memory_init(region, 300000);
     char* list[15];
     srand(time(0));
@@ -362,13 +388,14 @@ void test4(void)
     }
 
     char* pointer = (char*)memory_alloc(200000);
+    free(region);
 }
 
 /*TEST5 - PAMAT 300_000 - NAHODNE PRIDELOVANIE BLOKOV (8-50000) A ICH NAHODNE UVLONOVANIE,
  *                        NAKONIEC VSETKO UVOLNI A PRIRADI BLOK 250_000*/
 void test5(void)
 {
-    char region[300000];
+    char *region = (char*)malloc(300000);
     memory_init(region, 300000);
     char* list[30];
     for (int i =0;i<30;i++)
@@ -409,13 +436,14 @@ void test5(void)
         }
     }
     char* pointer = (char*)memory_alloc(250000);
+    free(region);
 }
 
 /*TEST6 - PAMAT 1_000_000 - NAHODNE PRIDELOVANIE BLOKOV (8-50000) A ICH NAHODNE UVLONOVANIE,
  *                        NAKONIEC VSETKO UVOLNI A PRIRADI BLOK 250_000*/
 void test6(void)
 {
-    char region[1000000];
+    char *region = (char*)malloc(1000000);
     memory_init(region, 1000000);
     char* list[30];
     for (int i =0;i<30;i++)
@@ -455,11 +483,95 @@ void test6(void)
             res = memory_free(list[i]);
         }
     }
+    print(1000000);
     char* pointer = (char*)memory_alloc(250000);
+    print(1000000);
+    free(region);
+}
+#include <stdio.h>
+#include <time.h>
+#include <string.h>
+#include <stdlib.h>
+//#define _CRT_SECURE_NO_WARNINGS
+
+//nakopirujte nasledujuci kod namiesto funkcie main
+
+void z1_testovac(char *region, char **pointer, int minBlock, int maxBlock, int minMemory, int maxMemory, int testFragDefrag) {
+	unsigned int allocated = 0;
+	unsigned int mallocated = 0;
+	unsigned int allocated_count = 0;
+	unsigned int mallocated_count = 0;
+	unsigned int i = 0;
+	int random_memory = 0;
+	int random = 0;
+	memset(region, 0, 100000);
+	random_memory = (rand() % (maxMemory-minMemory+1)) + minMemory;
+	memory_init(region + 500, random_memory);
+	if (testFragDefrag) {
+		do {
+			pointer[i] = memory_alloc(8);
+			if (pointer[i])
+				i++;
+		} while (pointer[i]);
+		for (int j = 0; j < i; j++) {
+			if (memory_check(pointer[j])) {
+				memory_free(pointer[j]);
+			}
+			else {
+				printf("Error: Wrong memory check.\n");
+			}
+		}
+	}
+	i = 0;
+	while (allocated <= random_memory-minBlock) {
+		random = (rand() % (maxBlock-minBlock+1)) + minBlock;
+		if (allocated + random > random_memory)
+			continue;
+		allocated += random;
+		allocated_count++;
+		pointer[i] = memory_alloc(random);
+		if (pointer[i]) {
+			i++;
+			mallocated_count++;
+			mallocated += random;
+		}
+	}
+	for (int j = 0; j < i; j++) {
+		if (memory_check(pointer[j])) {
+			memory_free(pointer[j]);
+		}
+		else {
+			printf("Error: Wrong memory check.\n");
+		}
+	}
+	memset(region + 500, 0, random_memory);
+	for (int j = 0; j < 100000; j++) {
+		if (region[j] != 0) {
+			region[j] = 0;
+			printf("Error: Modified memory outside the managed region. index: %d\n",j-500);
+		}
+	}
+	float result = ((float)mallocated_count / allocated_count) * 100;
+	float result_bytes = ((float)mallocated / allocated) * 100;
+	printf("Memory size of %d bytes: allocated %.2f%% blocks (%.2f%% bytes).\n", random_memory, result, result_bytes);
 }
 
-int main()
+int main() {
+	char region[100000];
+	char* pointer[13000];
+	srand(time(NULL));
+	z1_testovac(region, pointer, 8, 24, 50, 100, 1);
+	z1_testovac(region, pointer, 8, 1000, 10000, 20000, 0);
+	z1_testovac(region, pointer, 8, 35000, 50000, 99000, 0);
+	return 0;
+}
+/*int main()
 {
+    test1();
+    test2();
+    test3();
+    test4();
+    test5();
     test6();
     return 0;
-}
+}*/
